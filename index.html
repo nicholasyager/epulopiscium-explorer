@@ -1,0 +1,160 @@
+<html>
+
+<head>
+    <title>Epulopiscium Explorer</title>
+
+    <style>
+        body { margin: 0; }
+        canvas { width: 100%; height: 100% }
+    </style>
+
+    <script src="http://js.leapmotion.com/leap-0.6.4.min.js"></script>
+    <script src="http://js.leapmotion.com/leap-plugins-0.1.10.js"></script>
+    <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
+</head>
+<body>
+
+    <script src="js/three.min.js"></script>
+    <script>
+
+        function handStateFromHistory(hand, historySamples) {
+            if(hand.grabStrength == 1) return "closed";
+            else if (hand.grabStrength == 0) return "open";
+            else {
+                var sum = 0
+                for(var s = 0; s < historySamples; s++){
+                    var oldHand = controller.frame(s).hand(hand.id)
+                    if(!oldHand.valid) break;
+                    sum += oldHand.grabStrength
+                }
+                var avg = sum/s;
+                if(hand.grabStrength - avg < 0) return "opening";
+                else if (hand.grabStrength > 0) return "closing";
+            }
+            return"not detected";
+        }
+
+        average = function(a){
+            var r = {mean: 0, variance: 0, deviation: 0}, t = a.length;
+            for(var m, s = 0, l = t; l--; s += a[l]);
+            for(m = r.mean = s / t, l = t, s = 0; l--; s += Math.pow(a[l] - m, 2));
+            return r.deviation = Math.sqrt(r.variance = s / t), r;
+        }
+
+        function arrayMin(arr) {
+            var len = arr.length, min = Infinity;
+            while (len--) {
+                if (arr[len] < min) {
+                    min = arr[len];
+                }
+            }
+            return min;
+        };
+
+        function arrayMax(arr) {
+            var len = arr.length, max = -Infinity;
+                while (len--) {
+                    if (arr[len] > max) {
+                        max = arr[len];
+                    }
+                }
+            return max;
+        };
+
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+        var renderer = new THREE.WebGLRenderer();
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        document.body.appendChild( renderer.domElement );
+        var origin = new THREE.Vector3( 0, 3, 0 );
+        var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+        var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+        var cube = new THREE.Mesh( geometry, material );
+
+        $.getJSON( "data/points.json", function( data ) {
+
+            var xStats = average(data.x);
+            var yStats = average(data.y);
+            var zStats = average(data.z);
+
+            var xMax = arrayMax(data.x);
+            var xMin = arrayMin(data.x);
+
+            var yMax = arrayMax(data.y);
+            var yMin = arrayMin(data.y);
+
+            var zMax = arrayMax(data.z);
+            var zMin = arrayMin(data.z);
+
+
+            var xCorrection = (xStats.mean - xMin)/(xMax - xMin);
+            var yCorrection = (yStats.mean - yMin)/(yMax - yMin);
+            var zCorrection = (zStats.mean - zMin)/(zMax - zMin);
+  
+
+            var geometry = new THREE.Geometry();
+
+            for (var iteration = 0; iteration < 1000; iteration++){
+                var index = Math.floor(Math.random()* data.x.length );
+
+                var x =(((data.x[index]-xMin)/(xMax-xMin)) - xCorrection) * 3;
+                var y =(((data.z[index]-zMin)/(zMax-zMin)) - zCorrection);
+                var z =(((data.y[index]-yMin)/(yMax-yMin)) - yCorrection) * 3;
+
+                var sphere = new THREE.SphereGeometry( 0.01, 3, 3 );
+                var chromosome =  new THREE.Mesh( sphere, new THREE.MeshBasicMaterial( { color: 0x00ff00 } ) );
+                scene.add( chromosome);
+                chromosome.position.x=x;
+                chromosome.position.y=y+3;
+                chromosome.position.z=z;
+            }
+
+
+        });
+
+        camera.position.z = 4;
+        camera.position.y = 2;
+        function render() {
+            requestAnimationFrame( render );
+            renderer.render( scene, camera );
+        }
+        render();
+
+        var output = document.getElementById('output');
+
+        var startX = 0;
+        var startY = 0;
+        var startZ = 0;
+
+        var controller  = Leap.loop(function (frame) {
+            frame.hands.forEach(function(hand, index) {
+                if (handStateFromHistory(hand, 10) == "closing") {
+                    startX = hand.palmPosition[0]/50;
+                    startY = hand.palmPosition[1]/75;
+                    startZ = hand.palmPosition[2]/75;
+
+                } else if  (handStateFromHistory(hand, 10) == "closed"){
+
+                    camera.position.x += startX - hand.palmPosition[0]/50;
+                    camera.position.y += startY - hand.palmPosition[1]/75;
+                    camera.position.z += startZ - hand.palmPosition[2]/75;
+
+                    console.log(camera.position);
+
+                    // Reorient to face origin.
+                    camera.lookAt(origin);
+
+                    startX = hand.palmPosition[0]/50;
+                    startY = hand.palmPosition[1]/75;
+                    startZ = hand.palmPosition[2]/75;
+
+                }
+
+            });
+        });
+    </script>
+
+</body>
+
+
+</html>
