@@ -6,6 +6,8 @@
     <style>
         body { margin: 0; }
         canvas { width: 100%; height: 100% }
+        div { margin:0; padding:0; height:100%;width:100%;}
+        #stack {display:none;}
     </style>
 
     <script src="http://js.leapmotion.com/leap-0.6.4.min.js"></script>
@@ -14,8 +16,145 @@
     <script src="js/rainbowvis.js"></script>
 </head>
 <body>
+    <div id=stack>
+
+    </div>
+    <div id=cloud>
+
+    </div>
+
     <script src="js/three.min.js"></script>
+    <script src="js/OrbitControls.js"></script>
+    <script src="js/LeapTwoHandControls.js"></script>
     <script>
+
+        var scene, camera, renderer;
+        var mode = "3d";
+        var cube;
+        var controller;
+        var controls, orbitcontrols;
+
+        // Sets up the scene and intializes the render.
+        function init() {
+        
+            // Create the scene
+
+            scene = new THREE.Scene();
+            var WIDTH = window.innerWidth,
+                HEIGHT = window.innerHeight;
+
+            // Add the renderer to the DOM
+            renderer = new THREE.WebGLRenderer({antialias:true});
+            renderer.setSize(WIDTH,HEIGHT);
+            document.getElementById('cloud').appendChild(renderer.domElement);
+
+            // Initialize the camera
+            camera = new THREE.PerspectiveCamera(45, WIDTH/HEIGHT, 0.1, 20000);
+            camera.position.set(0,0,10);
+            scene.add(camera);
+
+            // Resize listener.
+            window.addEventListener('resize', function() {
+                var WIDTH = window.innerWidth,
+                    HEIGHT = window.innerHeight;
+                renderer.setSize(WIDTH,HEIGHT);
+                camera.aspect = WIDTH/HEIGHT;
+                camera.updateProjectionMatrix();
+            });
+
+            // LEAP Initialization
+
+            controller = new Leap.Controller();
+            controller.connect();
+
+            // Add Controls
+            controls = new THREE.LeapTwoHandControls(camera, controller, scene);
+
+
+            controls.translationSpeed   = 0.1;
+            controls.translationDecay   = 0.25;
+            controls.scaleDecay         = 0.5;
+            controls.rotationSlerp      = 1;
+            controls.rotationSpeed      = 2;
+            controls.pinchThreshold     = 0.8;
+            controls.transSmoothing     = 0.5;
+            controls.rotationSmoothing  = 0.2;
+
+            orbitcontrols = new THREE.OrbitControls(camera, renderer.domElement);
+        }
+
+        function addChromosomes() {
+
+            var numberOfChromosomes = 2000;
+
+            $.getJSON( "data/points.json", function( data ) {
+                xStats = average(data.x);
+                yStats = average(data.y);
+                zStats = average(data.z);
+
+                xMax = arrayMax(data.x);
+                xMin = arrayMin(data.x);
+
+                yMax = arrayMax(data.y);
+                yMin = arrayMin(data.y);
+
+                zMax = arrayMax(data.z);
+                zMin = arrayMin(data.z);
+
+                distMin = arrayMin(data.dist);
+                distMax = arrayMax(data.dist);
+
+
+                rainbow = new Rainbow();
+                rainbow.setNumberRange(distMin, 50);
+
+                var xCorrection = ((xMax+xMin)/2 - xMin)/(xMax - xMin);
+                var yCorrection = ((yMax+yMin)/2 - yMin)/(yMax - yMin);
+                var zCorrection = ((zMax+zMin)/2 - zMin)/(zMax - zMin);
+      
+
+                var geometry = new THREE.Geometry();
+
+                var xMean = yMean = zMean = 0;
+
+                for (var iteration = 0; iteration < numberOfChromosomes; iteration++){
+                    var index = Math.floor(Math.random()* data.x.length );
+                    if (data.dist[index] < 50) {
+
+
+                        var x =(((data.x[index]-xMin)/(xMax-xMin)) - xCorrection) * 30;
+                        var y =(((data.z[index]-zMin)/(zMax-zMin)) - zCorrection) * 10;
+                        var z =(((data.y[index]-yMin)/(yMax-yMin)) - yCorrection) * 30;
+
+                        var sphere = new THREE.SphereGeometry( 0.1, 5, 5 );
+                        chromosomeColor = new THREE.Color("#"+rainbow.colourAt(data.dist[index]));
+                        var chromosome =  new THREE.Mesh( sphere, new THREE.MeshBasicMaterial( { color:chromosomeColor } ) );
+                        scene.add( chromosome);
+                        chromosome.position.x=x;
+                        chromosome.position.y=y;
+                        chromosome.position.z=z;
+
+                        xMean += x;
+                        yMean += y;
+                        zMean += z;
+
+                    }
+                }
+                xMean = xMean / numberOfChromosomes;
+                yMean = yMean / numberOfChromosomes;
+                zMean = zMean / numberOfChromosomes;
+    
+                var geometry = new THREE.BoxGeometry( 0.01, 0.01, 0.01 );
+                var material = new THREE.MeshBasicMaterial( { color: 0xffffff } );
+                cube = new THREE.Mesh( geometry, material );
+                cube.position.set(xMean, yMean, zMean);
+                scene.add(cube);
+                console.log(xMean);
+
+                camera.lookAt(cube.position);
+            });
+
+        }
 
         function handStateFromHistory(hand, historySamples) {
             if(hand.grabStrength == 1) return "closed";
@@ -61,86 +200,14 @@
             return max;
         };
 
-        var mode = "3d";
 
-        var scene = new THREE.Scene();
-        var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-        var renderer = new THREE.WebGLRenderer();
-        renderer.setSize( window.innerWidth, window.innerHeight );
-        document.body.appendChild( renderer.domElement );
-        var origin = new THREE.Vector3( 0, 0, 0 );
-        var geometry = new THREE.BoxGeometry( 0.01, 0.01, 0.01 );
-        var material = new THREE.MeshBasicMaterial( { color: 0xffffff } );
-        var cube = new THREE.Mesh( geometry, material );
-        scene.add(cube);
+        init();
+        addChromosomes();
 
-        var numberOfChromosomes = 1000;
-
-        $.getJSON( "data/points.json", function( data ) {
-
-            xStats = average(data.x);
-            yStats = average(data.y);
-            zStats = average(data.z);
-
-            xMax = arrayMax(data.x);
-            xMin = arrayMin(data.x);
-
-            yMax = arrayMax(data.y);
-            yMin = arrayMin(data.y);
-
-            zMax = arrayMax(data.z);
-            zMin = arrayMin(data.z);
-
-            distMin = arrayMin(data.dist);
-            distMax = arrayMax(data.dist);
-
-
-            rainbow = new Rainbow();
-            rainbow.setNumberRange(distMin, 50);
-
-            var xCorrection = ((xMax+xMin)/2 - xMin)/(xMax - xMin);
-            var yCorrection = ((yMax+yMin)/2 - yMin)/(yMax - yMin);
-            var zCorrection = ((zMax+zMin)/2 - zMin)/(zMax - zMin);
-  
-
-            var geometry = new THREE.Geometry();
-
-            var xMean, yMean, zMean;
-
-            for (var iteration = 0; iteration < numberOfChromosomes; iteration++){
-                var index = Math.floor(Math.random()* data.x.length );
-                if (data.dist[index] < 50) {
-
-
-                    var x =(((data.x[index]-xMin)/(xMax-xMin)) - xCorrection) * 3;
-                    var y =(((data.z[index]-zMin)/(zMax-zMin)) - zCorrection);
-                    var z =(((data.y[index]-yMin)/(yMax-yMin)) - yCorrection) * 3;
-
-                    var sphere = new THREE.SphereGeometry( 0.01, 3, 3 );
-                    chromosomeColor = new THREE.Color("#"+rainbow.colourAt(data.dist[index]));
-                    var chromosome =  new THREE.Mesh( sphere, new THREE.MeshBasicMaterial( { color:chromosomeColor } ) );
-                    scene.add( chromosome);
-                    chromosome.position.x=x;
-                    chromosome.position.y=y;
-                    chromosome.position.z=z;
-
-                    xMean += x;
-                    yMean += y;
-                    zMean += z;
-
-                }
-            }
-            xMean = xMean / numberOfChromosomes;
-            yMean = yMean / numberOfChromosomes;
-            zMean = zMean / numberOfChromosomes;
-            //origin = new THREE.Vector3( xMean, yMean, zMean );
-            //camera.lookAt(origin);
-        });
-
-        camera.position.z = 4;
-        camera.position.y = 0;
         function render() {
             requestAnimationFrame( render );
+            controls.update();
+            orbitcontrols.update();
             renderer.render( scene, camera );
         }
         render();
@@ -151,11 +218,32 @@
         var startDistance = 0;
         var distance = 4;
 
-        var targetRotation;
-        var windowHalfX = window.innerWidth / 2;
-        var windowHalfY = window.innerHeight / 2;
+        /*
+        var controller  = Leap.loop({enableGestures: true}, function (frame) {
 
-        var controller  = Leap.loop(function (frame) {
+            // Initialize gestures
+            if(frame.valid && frame.gestures.length > 0){
+                frame.gestures.forEach(function(gesture) {
+                    switch (gesture.type) {
+                        case "swipe":
+                            if (gesture.direction[0] > 0){
+                                // right swipe
+                                mode = "3d"
+                                console.log("RIGHT SWIPE!");                                
+                                document.getElementById('stack').style.display="hidden";
+                                document.getElementById('cloud').style.display="block";
+
+                            } else {
+                                mode = "stack";
+                                console.log("LEFT SWIPE!");
+                                document.getElementById('cloud').style.display="hidden";
+                                document.getElementById('stack').style.display="block";
+                            }
+                            break;
+                    }
+                });
+            }
+
             if (mode == "3d"){
             if (frame.hands.length == 1) {
 
@@ -202,7 +290,7 @@
                             camera.position.applyAxisAngle(new THREE.Vector3(0,0,1), gamma);
                         }
                         // Reorient to face origin.
-                        camera.lookAt(origin);
+                        camera.lookAt(cube.position);
 
                         startVector = newVector;
 
@@ -264,8 +352,12 @@
             } else {
                 startDistance = 0;
             }
+            } else {
+                // Stack controls;
             }
+            --!>
         });
+    */
     </script>
 
 </body>
