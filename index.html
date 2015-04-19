@@ -6,6 +6,8 @@
     <style>
         body { margin: 0; }
         canvas { width: 100%; height: 100% }
+        div { margin:0; padding:0; height:100%;width:100%;}
+        #stack {display:none;}
     </style>
 
     <script src="http://js.leapmotion.com/leap-0.6.4.min.js"></script>
@@ -14,13 +16,23 @@
     <script src="js/rainbowvis.js"></script>
 </head>
 <body>
+    <div id=stack>
+
+    </div>
+    <div id=cloud>
+
+    </div>
+
     <script src="js/three.min.js"></script>
     <script src="js/OrbitControls.js"></script>
+    <script src="js/LeapTwoHandControls.js"></script>
     <script>
 
         var scene, camera, renderer;
         var mode = "3d";
         var cube;
+        var controller;
+        var controls, orbitcontrols;
 
         // Sets up the scene and intializes the render.
         function init() {
@@ -34,11 +46,11 @@
             // Add the renderer to the DOM
             renderer = new THREE.WebGLRenderer({antialias:true});
             renderer.setSize(WIDTH,HEIGHT);
-            document.body.appendChild(renderer.domElement);
+            document.getElementById('cloud').appendChild(renderer.domElement);
 
             // Initialize the camera
             camera = new THREE.PerspectiveCamera(45, WIDTH/HEIGHT, 0.1, 20000);
-            camera.position.set(0,0,4);
+            camera.position.set(0,0,10);
             scene.add(camera);
 
             // Resize listener.
@@ -50,14 +62,30 @@
                 camera.updateProjectionMatrix();
             });
 
+            // LEAP Initialization
+
+            controller = new Leap.Controller();
+            controller.connect();
 
             // Add Controls
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls = new THREE.LeapTwoHandControls(camera, controller, scene);
+
+
+            controls.translationSpeed   = 0.1;
+            controls.translationDecay   = 0.25;
+            controls.scaleDecay         = 0.5;
+            controls.rotationSlerp      = 1;
+            controls.rotationSpeed      = 2;
+            controls.pinchThreshold     = 0.8;
+            controls.transSmoothing     = 0.5;
+            controls.rotationSmoothing  = 0.2;
+
+            orbitcontrols = new THREE.OrbitControls(camera, renderer.domElement);
         }
 
         function addChromosomes() {
 
-            var numberOfChromosomes = 1000;
+            var numberOfChromosomes = 2000;
 
             $.getJSON( "data/points.json", function( data ) {
                 xStats = average(data.x);
@@ -94,11 +122,11 @@
                     if (data.dist[index] < 50) {
 
 
-                        var x =(((data.x[index]-xMin)/(xMax-xMin)) - xCorrection) * 3;
-                        var y =(((data.z[index]-zMin)/(zMax-zMin)) - zCorrection);
-                        var z =(((data.y[index]-yMin)/(yMax-yMin)) - yCorrection) * 3;
+                        var x =(((data.x[index]-xMin)/(xMax-xMin)) - xCorrection) * 30;
+                        var y =(((data.z[index]-zMin)/(zMax-zMin)) - zCorrection) * 10;
+                        var z =(((data.y[index]-yMin)/(yMax-yMin)) - yCorrection) * 30;
 
-                        var sphere = new THREE.SphereGeometry( 0.01, 3, 3 );
+                        var sphere = new THREE.SphereGeometry( 0.1, 5, 5 );
                         chromosomeColor = new THREE.Color("#"+rainbow.colourAt(data.dist[index]));
                         var chromosome =  new THREE.Mesh( sphere, new THREE.MeshBasicMaterial( { color:chromosomeColor } ) );
                         scene.add( chromosome);
@@ -178,6 +206,8 @@
 
         function render() {
             requestAnimationFrame( render );
+            controls.update();
+            orbitcontrols.update();
             renderer.render( scene, camera );
         }
         render();
@@ -188,11 +218,32 @@
         var startDistance = 0;
         var distance = 4;
 
-        var targetRotation;
-        var windowHalfX = window.innerWidth / 2;
-        var windowHalfY = window.innerHeight / 2;
+        /*
+        var controller  = Leap.loop({enableGestures: true}, function (frame) {
 
-        var controller  = Leap.loop(function (frame) {
+            // Initialize gestures
+            if(frame.valid && frame.gestures.length > 0){
+                frame.gestures.forEach(function(gesture) {
+                    switch (gesture.type) {
+                        case "swipe":
+                            if (gesture.direction[0] > 0){
+                                // right swipe
+                                mode = "3d"
+                                console.log("RIGHT SWIPE!");                                
+                                document.getElementById('stack').style.display="hidden";
+                                document.getElementById('cloud').style.display="block";
+
+                            } else {
+                                mode = "stack";
+                                console.log("LEFT SWIPE!");
+                                document.getElementById('cloud').style.display="hidden";
+                                document.getElementById('stack').style.display="block";
+                            }
+                            break;
+                    }
+                });
+            }
+
             if (mode == "3d"){
             if (frame.hands.length == 1) {
 
@@ -301,8 +352,12 @@
             } else {
                 startDistance = 0;
             }
+            } else {
+                // Stack controls;
             }
+            --!>
         });
+    */
     </script>
 
 </body>
