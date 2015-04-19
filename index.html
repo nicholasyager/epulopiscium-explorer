@@ -14,7 +14,6 @@
     <script src="js/rainbowvis.js"></script>
 </head>
 <body>
-
     <script src="js/three.min.js"></script>
     <script>
 
@@ -62,6 +61,8 @@
             return max;
         };
 
+        var mode = "3d";
+
         var scene = new THREE.Scene();
         var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
         var renderer = new THREE.WebGLRenderer();
@@ -104,6 +105,8 @@
 
             var geometry = new THREE.Geometry();
 
+            var xMean, yMean, zMean;
+
             for (var iteration = 0; iteration < numberOfChromosomes; iteration++){
                 var index = Math.floor(Math.random()* data.x.length );
                 if (data.dist[index] < 50) {
@@ -120,10 +123,18 @@
                     chromosome.position.x=x;
                     chromosome.position.y=y;
                     chromosome.position.z=z;
+
+                    xMean += x;
+                    yMean += y;
+                    zMean += z;
+
                 }
             }
-
-
+            xMean = xMean / numberOfChromosomes;
+            yMean = yMean / numberOfChromosomes;
+            zMean = zMean / numberOfChromosomes;
+            //origin = new THREE.Vector3( xMean, yMean, zMean );
+            //camera.lookAt(origin);
         });
 
         camera.position.z = 4;
@@ -140,12 +151,18 @@
         var startDistance = 0;
         var distance = 4;
 
+        var targetRotation;
+        var windowHalfX = window.innerWidth / 2;
+        var windowHalfY = window.innerHeight / 2;
+
         var controller  = Leap.loop(function (frame) {
+            if (mode == "3d"){
             if (frame.hands.length == 1) {
 
                 startDistance = 0;
 
                 hand = frame.hands[0];
+
 
                 if (hand.type == "right") {
 
@@ -184,7 +201,6 @@
                             camera.position.applyAxisAngle(new THREE.Vector3(1,0,0), phi);
                             camera.position.applyAxisAngle(new THREE.Vector3(0,0,1), gamma);
                         }
-
                         // Reorient to face origin.
                         camera.lookAt(origin);
 
@@ -247,6 +263,7 @@
 
             } else {
                 startDistance = 0;
+            }
             }
         });
     </script>
