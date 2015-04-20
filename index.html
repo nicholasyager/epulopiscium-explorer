@@ -4,8 +4,9 @@
     <title>Epulopiscium Explorer</title>
 
     <style>
-        body { margin: 0; }
+        body { margin: 0;background-color:black;}
         canvas { width: 100%; height: 100% }
+        img {position:fixed;margin:auto;left:0;display:none;}
         div { margin:0; padding:0; height:100%;width:100%;}
         #stack {display:none;}
     </style>
@@ -16,10 +17,10 @@
     <script src="js/rainbowvis.js"></script>
 </head>
 <body>
-    <div id=stack>
+    <div id=stack style="display:none;">
 
     </div>
-    <div id=cloud>
+    <div id=cloud style="display:block;">
 
     </div>
 
@@ -33,6 +34,18 @@
         var cube;
         var controller;
         var controls, orbitcontrols;
+
+        // Load images
+        baseString = "images/raw/C_2.21_5.100";
+        
+        for (var i = 0 ; i < 36; i++) {
+            if (i < 10) { pad = "0"; }
+            else { pad= "";}
+
+            imageString = baseString + pad + i + ".png";
+            template = '<img id='+i+' src="'+imageString+'"/>';
+            $("#stack").append(template);
+        }
 
         // Sets up the scene and intializes the render.
         function init() {
@@ -64,8 +77,49 @@
 
             // LEAP Initialization
 
-            controller = new Leap.Controller();
+            controller = new Leap.Controller({enableGestures: true});
+
+            var indexBuffer=1;
+
+            controller.loop( function(frame) {
+                if (mode == "stack") {
+                if (frame.hands.length >= 1){
+                    hand = frame.hands[0];
+
+                    if (hand.pinchStrength >= 0.75){
+                    index = Math.floor(((hand.palmPosition[1] - 150)/150)*35);
+                    if (index > 35) {index = 35;}
+                    if (index < 0) {index = 0;}
+                    
+                    $("#"+indexBuffer).css("display","none");
+                    $("#"+index).css("display","block");
+                    indexBuffer = index;
+                    }
+                }
+                }
+            });
+
             controller.connect();
+
+            controller.on("gesture", function(gesture) {
+                switch (gesture.type) {
+                    case "swipe":
+                        if (gesture.direction[0] > 0){
+                            // right swipe
+                            mode = "3d"
+                            console.log("RIGHT SWIPE!");                                
+                            document.getElementById('stack').style.display="none";
+                            document.getElementById('cloud').style.display="block";
+
+                        } else {
+                            mode = "stack";
+                            console.log("LEFT SWIPE!");
+                            document.getElementById('cloud').style.display="none";
+                            document.getElementById('stack').style.display="block";
+                        }
+                        break;
+                }
+            });
 
             // Add Controls
             controls = new THREE.LeapTwoHandControls(camera, controller, scene);
@@ -126,7 +180,7 @@
                         var y =(((data.z[index]-zMin)/(zMax-zMin)) - zCorrection) * 10;
                         var z =(((data.y[index]-yMin)/(yMax-yMin)) - yCorrection) * 30;
 
-                        var sphere = new THREE.SphereGeometry( 0.1, 5, 5 );
+                        var sphere = new THREE.SphereGeometry( 0.075, 6, 6 );
                         chromosomeColor = new THREE.Color("#"+rainbow.colourAt(data.dist[index]));
                         var chromosome =  new THREE.Mesh( sphere, new THREE.MeshBasicMaterial( { color:chromosomeColor } ) );
                         scene.add( chromosome);
